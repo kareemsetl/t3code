@@ -32,10 +32,10 @@ export class DatabaseStorage extends Context.Service<
 >()("t3/persistence/DatabaseStorage") {}
 
 /**
- * Deletes superseded history every few hours and hands freed pages back to
- * the filesystem every minute. Deleted events are always superseded by a
- * retained event with a higher sequence, so a client replaying from an older
- * cursor still reaches the same state; no replay boundary is published.
+ * Compacts history every few hours and hands freed pages back to the
+ * filesystem every minute. Superseded events are replaced by a retained event
+ * with a higher sequence; expired events raise their thread's replay floor, so
+ * a client resuming from below it gets a snapshot instead.
  */
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -96,9 +96,22 @@ const make = Effect.gen(function* () {
 
   // Even a pass that deletes nothing scans the event store. Persist completion
   // so restarting does not trigger another scan before the six-hour interval.
-  const compactedAtPath = path.join(path.dirname(config.dbPath), "compacted-at");
+  // Renamed when the compaction policy changes, so an upgrade runs the new
+  // policy a minute after start instead of up to six hours later.
+  const compactedAtPath = path.join(path.dirname(config.dbPath), "history-retained-at");
   const compact = Effect.gen(function* () {
-    const result = yield* maintenance.compactEventStore;
+    // 10% duty cycle. Unpaced, the first retention pass on a large database
+    // stalled foreground writes for seconds behind WAL checkpoints.
+    let sliceStarted = yield* Clock.monotonicTimeNanos;
+    const pace = Effect.gen(function* () {
+      const elapsedMs = Number((yield* Clock.monotonicTimeNanos) - sliceStarted) / 1_000_000;
+      if (elapsedMs < 25) return;
+      yield* Effect.sleep(Duration.millis(elapsedMs * 9));
+      sliceStarted = yield* Clock.monotonicTimeNanos;
+    });
+    const result = yield* maintenance.compactEventStore.pipe(
+      Effect.provideService(ProjectionMaintenance.CompactionPacer, pace),
+    );
     const completedAt = yield* Clock.currentTimeMillis;
     yield* fs.writeFileString(compactedAtPath, String(completedAt)).pipe(Effect.ignore);
     if (result.deletedEventCount > 0 || result.deletedReceiptCount > 0) {
