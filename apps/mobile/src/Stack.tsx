@@ -476,6 +476,8 @@ const THREAD_LINKING_PREFIX = "threads/:environmentId/:threadId";
 const WORKSPACE_OVERLAY_ROUTES = new Set([
   "PullRequestReview",
   "PullRequestInlineComment",
+  "PullRequestLabels",
+  "PullRequestEdit",
   "ConnectOnboarding",
   "Connections",
   "ConnectionsNew",

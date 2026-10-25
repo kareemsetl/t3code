@@ -5,6 +5,7 @@ import {
   pullRequestReactionEmoji,
   pullRequestReactionName,
   pullRequestReactionTooltip,
+  pullRequestReactionsSignature,
 } from "@t3tools/client-runtime/pull-request-reactions";
 import type {
   PullRequestComment,
@@ -28,12 +29,6 @@ import { usePullRequestPermissions } from "./usePullRequestPermissions";
 const EMPTY_PENDING: ReadonlyMap<PullRequestReactionContent, boolean> = new Map();
 const PILL = "min-h-8 flex-row items-center gap-1 rounded-full border px-2.5 active:opacity-70";
 
-function reactionsSignature(reactions: ReadonlyArray<PullRequestReaction>) {
-  return reactions
-    .map((reaction) => `${reaction.content}:${reaction.count}:${reaction.viewerHasReacted ? 1 : 0}`)
-    .join(" ");
-}
-
 function ReactionPills(props: {
   readonly params: PullRequestParams;
   readonly reactions: ReadonlyArray<PullRequestReaction>;
@@ -46,7 +41,7 @@ function ReactionPills(props: {
   const setReaction = useAtomCommand(composerPullRequests.setReaction, { reportFailure: false });
   // Keyed by what the host last reported, so a refresh that lands the change drops the overlay.
   const [pending, setPending] = useState({ signature: "", values: EMPTY_PENDING });
-  const signature = reactionsSignature(props.reactions);
+  const signature = pullRequestReactionsSignature(props.reactions);
   const values = pending.signature === signature ? pending.values : EMPTY_PENDING;
   const shown = applyPendingPullRequestReactions(props.reactions, values);
   const toggle = async (content: PullRequestReactionContent, reacted: boolean) => {
@@ -153,6 +148,7 @@ export function PullRequestCommentFooter(props: {
     "canEditComment" | "canReact"
   >;
   readonly onChanged: () => void;
+  readonly onEdit?: () => void;
 }) {
   const navigation = useNavigation();
   const { comment } = props;
@@ -174,7 +170,8 @@ export function PullRequestCommentFooter(props: {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Edit comment"
-          onPress={() =>
+          onPress={() => {
+            props.onEdit?.();
             navigation.navigate("PullRequestEdit", {
               ...props.params,
               field: "comment",
@@ -185,8 +182,8 @@ export function PullRequestCommentFooter(props: {
                 author: comment.author,
                 ...(comment.canEdit === undefined ? {} : { canEdit: comment.canEdit }),
               },
-            })
-          }
+            });
+          }}
           className={cn(PILL, "ml-auto border-transparent")}
         >
           <SymbolView name="pencil" size={13} tintColorClassName="accent-icon-muted" />
