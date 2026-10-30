@@ -2158,6 +2158,19 @@ describe("AcpAdapterV2", () => {
                       status: "completed",
                     },
                   });
+                  // Presentation rewrites `title` to "Ran command" for execute calls;
+                  // the verbatim ACP title survives in the tool-call data.
+                  yield* handler!({
+                    sessionId: "mock-session-1",
+                    update: {
+                      sessionUpdate: "tool_call",
+                      toolCallId: "exit-command",
+                      title: "exit_plan_mode",
+                      kind: "execute",
+                      rawInput: { plan: `${markdown}\n- Run the tests.` },
+                      status: "completed",
+                    },
+                  });
                   return { stopReason: "end_turn" as const };
                 }),
             }),
@@ -2200,15 +2213,17 @@ describe("AcpAdapterV2", () => {
       const plans = events.flatMap((event) =>
         event.type === "plan.updated" && event.plan.kind === "proposed_plan" ? [event.plan] : [],
       );
-      assert.equal(plans.length, 2);
+      assert.equal(plans.length, 3);
       assert.equal(plans[0]?.kind, "proposed_plan");
       assert.equal(plans[0]?.markdown, markdown);
       assert.equal(plans[1]?.markdown, `${markdown}\n- Verify the result.`);
+      assert.equal(plans[2]?.markdown, `${markdown}\n- Run the tests.`);
       assert.equal(plans[0]?.id, plans[1]?.id);
+      assert.equal(plans[0]?.id, plans[2]?.id);
       const items = events.flatMap((event) =>
         event.type === "turn_item.updated" ? [event.turnItem] : [],
       );
-      assert.equal(items.filter((item) => item.type === "proposed_plan").length, 2);
+      assert.equal(items.filter((item) => item.type === "proposed_plan").length, 3);
       assert.isTrue(items.some((item) => item.type === "dynamic_tool" && item.title === "write"));
     }).pipe(Effect.provide(layerTest), Effect.scoped),
   );
