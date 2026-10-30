@@ -223,6 +223,21 @@ describe("Antigravity permissions and questions", () => {
     ).toEqual(["proceed", "stay"]);
   });
 
+  it("keeps a mode switch as a question when option ids are padded", () => {
+    const modeSwitch = {
+      ...questionRequest,
+      toolCall: { ...questionRequest.toolCall, kind: "switch_mode" as const },
+      options: [
+        { optionId: " switch-to-build ", name: "Yes", kind: "allow_once" as const },
+        { optionId: "stay-in-plan", name: "No", kind: "reject_once" as const },
+      ],
+    };
+    expect(isAntigravityUserInputRequest(modeSwitch)).toBe(true);
+    expect(
+      makeAntigravityUserInputResponse(modeSwitch, { interaction_9960062f: " switch-to-build " }),
+    ).toEqual({ outcome: { outcome: "selected", optionId: " switch-to-build " } });
+  });
+
   it("keeps every mode-switch choice when permission kinds repeat", () => {
     const modeSwitch = {
       ...questionRequest,

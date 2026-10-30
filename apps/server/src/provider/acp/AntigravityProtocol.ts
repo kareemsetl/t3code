@@ -58,7 +58,10 @@ function hasAntigravityApprovalOptions(request: EffectAcpSchema.RequestPermissio
         (option.kind === "allow_once" ||
           option.kind === "allow_always" ||
           option.kind === "reject_once") &&
-        option.optionId.trim().length > 0,
+        option.optionId.trim().length > 0 &&
+        // The approval response sends the trimmed id, so a padded id would come
+        // back to the agent as an option it never offered.
+        option.optionId === option.optionId.trim(),
     )
   );
 }
